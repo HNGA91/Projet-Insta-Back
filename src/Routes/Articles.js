@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 const Article = require("../Models/Article.js");
 
-// GET : Récupérer tous les produits
+// GET : Récupérer tous les articles
 router.get('/', async (req, res) => {
     try {
         const produits = await Article.find();
 
-        // Renvoie les produits au client au format JSON
+        // Renvoie les articles au front au format JSON
         res.json(produits); 
     } catch  (err) {
         res.status(500).json({ message : err.message });

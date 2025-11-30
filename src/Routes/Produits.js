@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
     try {
         const produits = await Listproduit.find();
 
-        // Renvoie les produits au client au format JSON
+        // Renvoie les produits au front au format JSON
         res.json(produits); 
     } catch  (err) {
         res.status(500).json({ message : err.message });

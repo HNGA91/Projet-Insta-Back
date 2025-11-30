@@ -5,9 +5,9 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
     try {
         await mongoose.connect('mongodb://localhost:27017/InstaDB');
-        console.log('Connecté à MongoDB');
+        console.log("✅ Connecté à MongoDB");
     } catch (err) {
-        console.error('Erreur MongoDB:', err);
+        console.error("❌ Erreur MongoDB:", err);
     }
 };
 
