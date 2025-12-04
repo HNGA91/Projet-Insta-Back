@@ -1,11 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const UserData = require("../Models/UserData");
+const authenticateToken = require("../Middleware/Authentification");
 
 // GET : Récupérer les données utilisateur (panier + favoris)
 // Afin de charger les données au login ou au démarrage de l'app
-router.get("/:email", async (req, res) => {
+router.get("/:email", authenticateToken, async (req, res) => {
 	try {
+		// req.user est disponible grâce au middleware
+		console.log("✅ Utilisateur authentifié:", req.user.email);
+
 		// Cherche l'utilisateur dans la collection UserData dans MongoDB
 		const userData = await UserData.findOne({ userEmail: req.params.email });
 
@@ -33,7 +37,7 @@ router.get("/:email", async (req, res) => {
 
 // PUT : Mettre à jour le panier
 // Synchronise le panier après chaque modification
-router.put("/:email/panier", async (req, res) => {
+router.put("/:email/panier", authenticateToken, async (req, res) => {
 	try {
 		// Reçoit le panier complet depuis le frontend
 		const { panier } = req.body;
@@ -59,7 +63,7 @@ router.put("/:email/panier", async (req, res) => {
 
 // PUT : Mettre à jour les favoris
 // Synchronise les favoris après chaque modification
-router.put("/:email/favoris", async (req, res) => {
+router.put("/:email/favoris", authenticateToken, async (req, res) => {
 	try {
 		// Reçoit les favoris complets depuis le frontend
 		const { favoris } = req.body;
@@ -81,7 +85,7 @@ router.put("/:email/favoris", async (req, res) => {
 });
 
 // DELETE : Supprimer les données utilisateur (pour la déconnexion)
-router.delete("/:email", async (req, res) => {
+router.delete("/:email", authenticateToken, async (req, res) => {
 	try {
 		await UserData.findOneAndDelete({ userEmail: req.params.email });
 		// Ce message s'affiche dans la console du frontend qui a fait la requête
