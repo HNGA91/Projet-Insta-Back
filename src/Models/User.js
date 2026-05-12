@@ -1,67 +1,84 @@
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+const pool = require("../DBMySQL");
 
-const UserSchema = new mongoose.Schema({
-	Nom: {
-		type: String,
-		required: true,
-	},
-	Prenom: {
-		type: String,
-		required: true,
-	},
-	Email: {
-		type: String,
-		required: true,
-		unique: true,
-		lowercase: true,
-	},
-	Tel: {
-		type: String,
-		required: true,
-	},
-	Password: {
-		type: String,
-		required: true,
-	},
-	dateInscription: {
-		type: Date,
-		default: Date.now,
-	},
-	lastLoginFrom: {
-		type: String,
-		enum: ["web", "mobile"],
-	},
-	lastLoginAt: {
-		type: Date,
-	},
-});
-
-// Middleware pour hasher le mot de passe avant sauvegarde
-UserSchema
-	// S'exécute automatiquement avant que l'utilisateur soit sauvegardé dans la base
-	.pre("save", async function (next) {
-        // Vérifie: "Est-ce que le mot de passe a été modifié ?";
-		if (!this.isModified("Password")) return next();
-
-		try {
-			//Génère un "sel" cryptographique
-			// Sel = chaîne aléatoire unique pour chaque utilisateur
-			// 10 = coût du hash (plus élevé = plus sécurisé mais plus lent)
-			const salt = await bcrypt.genSalt(10);
-			// this = l'utilisateur en cours de création/modification
-			this.Password = await bcrypt.hash(this.Password, salt);
-			next(); // Passe au prochain middleware ou sauvegarde
-		} catch (error) {
-			next(error); // si il y a une erreur
-		}
-	});
-
-// Méthode pour vérifier le mot de passe
-UserSchema.methods.comparePassword = async function (candidatePassword) {
-	return await bcrypt.compare(candidatePassword, this.Password);
-	// Compare un mot de passe en clair avec un hash stocké, Ne déchiffre pas le hash (impossible)
-	// Hash le mot de passe candidat avec le même sel → compare les hashs
+// Récupérer tous les utilisateurs
+const getAllUsers = async () => {
+	const [rows] = await pool.query(`
+    SELECT id_user, nom, prenom, email, tel, role, lastLoginFrom, lastLoginAt, dateInscription
+    FROM Utilisateur
+  `);
+	return rows;
 };
 
-module.exports = mongoose.model("User", UserSchema, "Users");
+// Récupérer un utilisateur par ID
+const getUserById = async (id) => {
+	const [rows] = await pool.query(
+		`
+    SELECT id_user, nom, prenom, email, tel, role, lastLoginFrom, lastLoginAt, dateInscription
+    FROM Utilisateur WHERE id_user = ?
+  `,
+		[id],
+	);
+	return rows[0] || null;
+};
+
+// Récupérer un utilisateur par email (utile pour la connexion)
+const getUserByEmail = async (email) => {
+	const [rows] = await pool.query("SELECT * FROM Utilisateur WHERE email = ?", [email]);
+	return rows[0] || null;
+};
+
+// Créer un utilisateur
+const createUser = async (data) => {
+	const { nom, prenom, email, tel, role, password } = data;
+	const [result] = await pool.query(
+		`
+    INSERT INTO Utilisateur (nom, prenom, email, tel, role, password)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `,
+		[nom, prenom, email, tel, role, password],
+	);
+	return result.insertId;
+};
+
+// Modifier un utilisateur
+const updateUser = async (id, data) => {
+	const { nom, prenom, email, tel, role } = data;
+	const [result] = await pool.query(
+		`
+    UPDATE Utilisateur
+    SET nom = ?, prenom = ?, email = ?, tel = ?, role = ?
+    WHERE id_user = ?
+  `,
+		[nom, prenom, email, tel, role, id],
+	);
+	return result.affectedRows;
+};
+
+// Mettre à jour la dernière connexion
+const updateLastLogin = async (id, lastLoginFrom) => {
+	const [result] = await pool.query(
+		`
+    UPDATE Utilisateur
+    SET lastLoginFrom = ?, lastLoginAt = NOW()
+    WHERE id_user = ?
+  `,
+		[lastLoginFrom, id],
+	);
+	return result.affectedRows;
+};
+
+// Supprimer un utilisateur
+const deleteUser = async (id) => {
+	const [result] = await pool.query("DELETE FROM Utilisateur WHERE id_user = ?", [id]);
+	return result.affectedRows;
+};
+
+module.exports = {
+	getAllUsers,
+	getUserById,
+	getUserByEmail,
+	createUser,
+	updateUser,
+	updateLastLogin,
+	deleteUser,
+};

@@ -1,13 +1,41 @@
-const mongoose = require('mongoose');
+const pool = require("../DBMySQL");
 
-const ProduitShema = new mongoose.Schema({
-    nom: String,
-    categorie: String,
-    prix: Number,
-    stock: Number,
-    disponible: Boolean,
-    description: String,
-    tags: [String],
-});
+// Récupérer tous les produits
+const getAllProduits = async () => {
+	const [rows] = await pool.query("SELECT * FROM Produit");
+	return rows;
+};
 
-module.exports = mongoose.model('Listproduits', ProduitShema, 'Produits');
+// Récupérer un produit par ID
+const getProduitById = async (id) => {
+	const [rows] = await pool.query("SELECT * FROM Produit WHERE id_produit = ?", [id]);
+	return rows[0] || null;
+};
+
+// Créer un produit
+const createProduit = async (data) => {
+	const { titre, image, image_alt } = data;
+	const [result] = await pool.query("INSERT INTO Produit (titre, image, image_alt) VALUES (?, ?, ?)", [titre, image, image_alt]);
+	return result.insertId;
+};
+
+// Modifier un produit
+const updateProduit = async (id, data) => {
+	const { titre, image, image_alt } = data;
+	const [result] = await pool.query("UPDATE Produit SET titre = ?, image = ?, image_alt = ? WHERE id_produit = ?", [titre, image, image_alt, id]);
+	return result.affectedRows;
+};
+
+// Supprimer un produit
+const deleteProduit = async (id) => {
+	const [result] = await pool.query("DELETE FROM Produit WHERE id_produit = ?", [id]);
+	return result.affectedRows;
+};
+
+module.exports = {
+	getAllProduits,
+	getProduitById,
+	createProduit,
+	updateProduit,
+	deleteProduit,
+};
