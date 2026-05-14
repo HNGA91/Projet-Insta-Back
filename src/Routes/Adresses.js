@@ -1,7 +1,8 @@
-// src/Routes/Adresses.js
 const express = require("express");
 const router = express.Router();
 const Adresse = require("../Models/MySQL/Adresse");
+const Gerer = require("../Models/MySQL/Gerer");
+const Utilisateur = require("../Models/MySQL/User");
 const authenticateToken = require("../Middleware/Authentification");
 
 // GET - Récupérer toutes les adresses d'un utilisateur
@@ -15,11 +16,12 @@ router.get("/user/:id_user", authenticateToken, async (req, res) => {
 			});
 		}
 
-		const adresses = await Adresse.findAll({
-			where: { id_user: req.params.id_user },
+		// Récupérer les adresses via la table de jonction gerer
+		const utilisateur = await Utilisateur.findByPk(req.params.id_user, {
+			include: [{ model: Adresse, as: "adresses" }],
 		});
 
-		res.status(200).json(adresses);
+		res.status(200).json(utilisateur.adresses);
 	} catch (error) {
 		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}
@@ -35,7 +37,11 @@ router.get("/:id", authenticateToken, async (req, res) => {
 		}
 
 		// Vérifier que l'adresse appartient bien à l'utilisateur connecté
-		if (adresse.id_user !== req.user.id_user) {
+		const lien = await Gerer.findOne({
+			where: { id_user: req.user.id_user, id_adresse: adresse.id_adresse },
+		});
+
+        if (!lien) {
 			return res.status(403).json({ message: "⛔ Accès non autorisé" });
 		}
 
@@ -57,13 +63,51 @@ router.post("/", authenticateToken, async (req, res) => {
 			ville,
 			code_postal,
 			pays: pays || "France",
+		});
+
+		// Créer le lien dans gerer
+		// Respecte la cardinalité 1,n : l'adresse a immédiatement au moins 1 utilisateur
+		await Gerer.create({
 			id_user: req.user.id_user,
+			id_adresse: adresse.id_adresse,
 		});
 
 		res.status(201).json({
-			message: "Adresse créée",
+			message: "✅ Adresse créée",
 			id_adresse: adresse.id_adresse,
 		});
+	} catch (error) {
+		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
+	}
+});
+
+// POST - Associer une adresse existante à l'utilisateur connecté
+// Cas d'usage : plusieurs utilisateurs partagent le même foyer
+router.post("/associer/:id_adresse", authenticateToken, async (req, res) => {
+	try {
+		const adresse = await Adresse.findByPk(req.params.id_adresse);
+
+		if (!adresse) {
+			return res.status(404).json({ message: "❌ Adresse non trouvée" });
+		}
+
+		// Vérifier que le lien n'existe pas déjà
+		const lienExistant = await Gerer.findOne({
+			where: { id_user: req.user.id_user, id_adresse: adresse.id_adresse },
+		});
+
+		if (lienExistant) {
+			return res.status(409).json({
+				message: "⚠️ Cette adresse est déjà associée à votre compte",
+			});
+		}
+
+		await Gerer.create({
+			id_user: req.user.id_user,
+			id_adresse: adresse.id_adresse,
+		});
+
+		res.status(201).json({ message: "✅ Adresse associée à votre compte" });
 	} catch (error) {
 		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}
@@ -79,7 +123,11 @@ router.put("/:id", authenticateToken, async (req, res) => {
 		}
 
 		// Vérifier que l'adresse appartient bien à l'utilisateur connecté
-		if (adresse.id_user !== req.user.id_user) {
+		const lien = await Gerer.findOne({
+			where: { id_user: req.user.id_user, id_adresse: adresse.id_adresse },
+		});
+
+		if (!lien) {
 			return res.status(403).json({ message: "⛔ Accès non autorisé" });
 		}
 
@@ -92,7 +140,9 @@ router.put("/:id", authenticateToken, async (req, res) => {
 	}
 });
 
-// DELETE - Supprimer une adresse
+// DELETE - Dissocier l'utilisateur de l'adresse
+// Respecte la cardinalité 1,n : on ne supprime l'adresse que si
+// plus aucun utilisateur ne lui est associé
 router.delete("/:id", authenticateToken, async (req, res) => {
 	try {
 		const adresse = await Adresse.findByPk(req.params.id);
@@ -101,13 +151,34 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 			return res.status(404).json({ message: "❌ Adresse non trouvée" });
 		}
 
-		// Vérifier que l'adresse appartient bien à l'utilisateur connecté
-		if (adresse.id_user !== req.user.id_user) {
+		// Vérifier que le lien existe
+		const lien = await Gerer.findOne({
+			where: { id_user: req.user.id_user, id_adresse: adresse.id_adresse },
+		});
+
+		if (!lien) {
 			return res.status(403).json({ message: "⛔ Accès non autorisé" });
 		}
 
-		await adresse.destroy();
-		res.status(200).json({ message: "✅ Adresse supprimée" });
+		// Supprimer le lien entre l'utilisateur et l'adresse
+		await lien.destroy();
+
+		// Vérifier combien d'utilisateurs utilisent encore cette adresse
+		const nbUtilisateurs = await Gerer.count({
+			where: { id_adresse: adresse.id_adresse },
+		});
+
+		// Cardinalité 1,n : si plus aucun utilisateur n'est lié → supprimer l'adresse
+		if (nbUtilisateurs === 0) {
+			await adresse.destroy();
+			return res.status(200).json({
+				message: "✅ Adresse supprimée définitivement (aucun autre utilisateur associé)",
+			});
+		}
+
+		res.status(200).json({
+			message: "✅ Adresse dissociée de votre compte",
+		});
 	} catch (error) {
 		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}

@@ -8,6 +8,7 @@ const ArticleRoutes = require('./Routes/Articles');
 const ProduitRoutes = require("./Routes/Produits");
 const UserDataRoutes = require("./Routes/UserData");
 const AuthRoutes = require("./Routes/AuthRoutes");
+require("./Models/MySQL/Gerer");
 
 const app = express();
 
