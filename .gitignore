@@ -25,3 +25,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Certificats SSL locaux - ne jamais pousser sur GitHub
+localhost.pem
+localhost-key.pem

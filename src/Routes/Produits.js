@@ -1,44 +1,48 @@
 const express = require("express");
 const router = express.Router();
-const { getAllProduits, getProduitById, createProduit, updateProduit, deleteProduit } = require("../Models/Produit");
+const Produit = require("../Models/MySQL/Produit");
+const authenticateToken = require("../Middleware/Authentification");
+const isAdmin = require("../Middleware/IsAdmin");
 
 // GET - Récupérer tous les produits
 router.get("/", async (req, res) => {
 	try {
-		const produits = await getAllProduits();
+		const produits = await Produit.findAll();
 		res.status(200).json(produits);
 	} catch (error) {
-		res.status(500).json({ message: "Erreur serveur", error: error.message });
+		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}
 });
 
 // GET - Récupérer un produit par ID
 router.get("/:id", async (req, res) => {
 	try {
-		const produit = await getProduitById(req.params.id);
+		const produit = await Produit.findByPk(req.params.id);
 		if (!produit) {
-			return res.status(404).json({ message: "Produit non trouvé" });
+			return res.status(404).json({ message: "❌ Produit non trouvé" });
 		}
 		res.status(200).json(produit);
 	} catch (error) {
-		res.status(500).json({ message: "Erreur serveur", error: error.message });
+		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}
 });
 
 // POST - Créer un produit
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, isAdmin, async (req, res) => {
 	try {
-		const insertId = await createProduit(req.body);
-		res.status(201).json({ message: "Produit créé", id_produit: insertId });
+		const produit = await Produit.create(req.body);
+		res.status(201).json({ message: "✅ Produit créé", id_produit: produit.id_produit });
 	} catch (error) {
-		res.status(500).json({ message: "Erreur serveur", error: error.message });
+		res.status(500).json({ message: "❌ Erreur serveur", error: error.message });
 	}
 });
 
 // PUT - Modifier un produit
-router.put("/:id", async (req, res) => {
+router.put("/:id", authenticateToken, isAdmin, async (req, res) => {
 	try {
-		const affectedRows = await updateProduit(req.params.id, req.body);
+		const [affectedRows] = await Produit.update(req.body, {
+			where: { id_produit: req.params.id },
+		});
 		if (affectedRows === 0) {
 			return res.status(404).json({ message: "Produit non trouvé" });
 		}
@@ -49,9 +53,11 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE - Supprimer un produit
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
 	try {
-		const affectedRows = await deleteProduit(req.params.id);
+		const affectedRows = await Produit.destroy({
+			where: { id_produit: req.params.id },
+		});
 		if (affectedRows === 0) {
 			return res.status(404).json({ message: "Produit non trouvé" });
 		}

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const UserData = require("../Models/UserData");
+const UserData = require("../Models/MongoDB/UserData");
 const authenticateToken = require("../Middleware/Authentification");
 
 // GET : Récupérer les données utilisateur (panier + favoris)
@@ -89,7 +89,7 @@ router.delete("/:email", authenticateToken, async (req, res) => {
 	try {
 		await UserData.findOneAndDelete({ userEmail: req.params.email });
 		// Ce message s'affiche dans la console du frontend qui a fait la requête
-		res.json({ message: "Données utilisateur supprimées" });
+		res.json({ message: "✅ Données utilisateur supprimées" });
 	} catch (err) {
 		console.error("❌ Erreur lors de la suppression des données:", err);
 		res.status(500).json({ message: err.message });
