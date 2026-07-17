@@ -16,6 +16,11 @@ const contactRoutes = require("./Routes/Contact");
 
 const app = express();
 
+// Liste des origines autorisées à appeler le backend :
+// - l'URL de développement local (toujours utile pour continuer à coder en local)
+// - l'URL de production, définie via la variable d'environnement FRONTEND_URL
+const allowedOrigins = ["https://localhost:5173", process.env.FRONTEND_URL].filter(Boolean);
+
 // IMPORTANT : le webhook Stripe doit être déclaré AVANT express.json()
 // car Stripe vérifie la signature sur le body brut
 app.use("/api/paiement/webhook", express.raw({ type: "application/json" }));
@@ -33,31 +38,44 @@ app.use(
 				defaultSrc: ["'self'"],
 				// Scripts JS autorisés uniquement depuis le domaine
 				scriptSrc: ["'self'"],
-				// Images autorisées depuis le domaine + data: + le back (port 3000)
-				imgSrc: ["'self'", "data:", "https://localhost:3000"],
+				// Images autorisées depuis le domaine + data: + les origines autorisées
+				imgSrc: ["'self'", "data:", ...allowedOrigins],
 				// Styles autorisés depuis le domaine
 				styleSrc: ["'self'"],
-				// Connexions API autorisées vers le backend en HTTPS
-				connectSrc: ["'self'", "https://localhost:3000"],
+				// Connexions API autorisées vers les origines autorisées
+				connectSrc: ["'self'", ...allowedOrigins],
 			},
 		},
 	}),
 );
 
 // Middlewares existants
-app.use(cors({ origin: "https://localhost:5173", credentials: true }));
-// Uniquement https://localhost:5173 et Cookies transmis avec les requêtes
+// origin accepte soit localhost (dev), soit l'URL de production (FRONTEND_URL)
+app.use(
+	cors({
+		origin: allowedOrigins,
+		credentials: true,
+	}),
+);
 app.use(express.json());
 app.use(cookieParser());
 
 // Servir les images statiques depuis public/Images/
-// Accessible via https://localhost:3000/Images/...
-// cross-origin: "cross-origin" permet au front (port 5173) d'accéder aux images du back (port 3000)
-app.use("/Images", (req, res, next) => {
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    res.setHeader("Access-Control-Allow-Origin", "https://localhost:5173");
-    next();
-}, express.static(path.join(process.cwd(), "public", "Images")));
+// Accessible via /Images/...
+// cross-origin: "cross-origin" permet au front d'accéder aux images du back
+app.use(
+	"/Images",
+	(req, res, next) => {
+		res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+		// On reflète l'origine de la requête si elle fait partie des origines autorisées
+		const origin = req.headers.origin;
+		if (allowedOrigins.includes(origin)) {
+			res.setHeader("Access-Control-Allow-Origin", origin);
+		}
+		next();
+	},
+	express.static(path.join(process.cwd(), "public", "Images")),
+);
 
 // Dit à Express : "Toutes ces routes doivent être accessibles"
 app.use("/api/adresses", AdresseRoutes);
