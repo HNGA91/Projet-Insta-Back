@@ -90,13 +90,23 @@ router.post("/create-checkout-session", paiementLimiter, authenticateToken, asyn
 			// URLs de redirection après paiement
 			success_url: `${process.env.FRONTEND_URL}/paiement-success?session_id={CHECKOUT_SESSION_ID}`,
 			cancel_url: `${process.env.FRONTEND_URL}/paiement-cancel`,
-			// Métadonnées transmises au webhook pour créer la commande
+			// Métadonnées transmises au webhook pour créer la commande.
+			// IMPORTANT : Stripe limite chaque valeur de métadonnée à 500 caractères.
+			// On ne stocke donc que l'identifiant et la quantité de chaque article
+			// (clés courtes "i"/"q"), jamais le titre, l'image ou le prix — ces
+			// informations seront récupérées depuis la base de données dans le
+			// webhook, ce qui a aussi l'avantage d'empêcher toute manipulation
+			// du prix depuis le client.
 			metadata: {
 				id_user: req.user.id_user.toString(),
 				id_adresse_livraison: id_adresse_livraison.toString(),
 				id_adresse_facturation: id_adresse_facturation.toString(),
-				// On sérialise le panier en JSON pour le transmettre au webhook
-				panier: JSON.stringify(panier),
+				panier: JSON.stringify(
+					panier.map((item) => ({
+						i: item._id ? parseInt(item._id) : item.id_article,
+						q: item.quantite || 1,
+					})),
+				),
 			},
 		});
 
@@ -139,17 +149,29 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 		try {
 			const { id_user, id_adresse_livraison, id_adresse_facturation, panier: panierJSON } = session.metadata;
 
-			const panier = JSON.parse(panierJSON);
+			// panierAllege ne contient plus que { i: id_article, q: quantite }
+			const panierAllege = JSON.parse(panierJSON);
+
 			const adresseLivraison = await Adresse.findByPk(id_adresse_livraison);
 			const adresseFacturation = await Adresse.findByPk(id_adresse_facturation);
 
+			// On récupère chaque article depuis la base de données pour connaître
+			// son prix réel — jamais celui envoyé par le client, afin d'éviter
+			// toute manipulation de prix côté frontend.
+			const articlesAvecQuantite = await Promise.all(
+				panierAllege.map(async (entry) => {
+					const article = await Article.findByPk(entry.i, { transaction });
+					return { article, quantite: entry.q };
+				}),
+			);
+
 			const reference = generateReference();
-			const montant = panier.reduce((acc, item) => acc + item.prix * item.quantite, 0);
+			const montant = articlesAvecQuantite.reduce((acc, { article, quantite }) => acc + parseFloat(article.prix) * quantite, 0);
 
 			// Créer les lignes Commander
-			const lignes = panier.map((item) => ({
+			const lignes = articlesAvecQuantite.map(({ article, quantite }) => ({
 				id_user: parseInt(id_user),
-				id_article: item._id ? parseInt(item._id) : item.id_article,
+				id_article: article.id_article,
 				reference,
 				adresseFacturation_rue: adresseFacturation.rue,
 				adresseFacturation_ville: adresseFacturation.ville,
@@ -159,8 +181,8 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 				adresseLivraison_ville: adresseLivraison.ville,
 				adresseLivraison_cp: adresseLivraison.code_postal,
 				adresseLivraison_pays: adresseLivraison.pays,
-				quantite: item.quantite,
-				prix_unitaire: item.prix,
+				quantite,
+				prix_unitaire: article.prix,
 				montant: parseFloat(montant.toFixed(2)),
 				status: "confirmee",
 			}));
@@ -168,11 +190,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 			await Commander.bulkCreate(lignes, { transaction });
 
 			// Mettre à jour le stock
-			for (const item of panier) {
-				const id = item._id ? parseInt(item._id) : item.id_article;
-				const article = await Article.findByPk(id, { transaction });
+			for (const { article, quantite } of articlesAvecQuantite) {
 				if (article) {
-					const newStock = article.stock - item.quantite;
+					const newStock = article.stock - quantite;
 					const disponibilite = newStock <= 0 ? "rupture" : "disponible";
 					await article.update({ stock: newStock, disponibilite }, { transaction });
 				}
