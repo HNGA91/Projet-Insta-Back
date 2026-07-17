@@ -1,5 +1,6 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../../SequelizeDB");
+const Utilisateur = require("./User");
 
 const Adresse = sequelize.define(
 	"Adresse",
@@ -32,5 +33,10 @@ const Adresse = sequelize.define(
 		timestamps: false,
 	},
 );
+
+// Association 1,n : une Adresse appartient à un seul Utilisateur
+// Un Utilisateur peut posséder plusieurs Adresses (mais ne les partage pas)
+Adresse.belongsTo(Utilisateur, { foreignKey: "id_user", as: "utilisateur" });
+Utilisateur.hasMany(Adresse, { foreignKey: "id_user", as: "adresses" });
 
 module.exports = Adresse;

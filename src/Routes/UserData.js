@@ -30,7 +30,7 @@ router.get("/:email", authenticateToken, async (req, res) => {
 		res.json(userData);
 	} catch (err) {
         // En cas d'erreur renvoi une erreur 500
-		console.error("❌ Erreur lors de la récupération des données:", err);
+		console.error("Erreur lors de la récupération des données:", err);
 		res.status(500).json({ message: err.message });
 	}
 });
@@ -56,7 +56,7 @@ router.put("/:email/panier", authenticateToken, async (req, res) => {
 
 		res.json(userData); // Retourne les données mises à jour
 	} catch (err) {
-		console.error("❌ Erreur lors de la mise à jour du panier:", err);
+		console.error("Erreur lors de la mise à jour du panier:", err);
 		res.status(500).json({ message: err.message });
 	}
 });
@@ -79,7 +79,7 @@ router.put("/:email/favoris", authenticateToken, async (req, res) => {
 
 		res.json(userData);
 	} catch (err) {
-		console.error("❌ Erreur lors de la mise à jour des favoris:", err);
+		console.error("Erreur lors de la mise à jour des favoris:", err);
 		res.status(500).json({ message: err.message });
 	}
 });
@@ -91,7 +91,7 @@ router.delete("/:email", authenticateToken, async (req, res) => {
 		// Ce message s'affiche dans la console du frontend qui a fait la requête
 		res.json({ message: "✅ Données utilisateur supprimées" });
 	} catch (err) {
-		console.error("❌ Erreur lors de la suppression des données:", err);
+		console.error("Erreur lors de la suppression des données:", err);
 		res.status(500).json({ message: err.message });
 	}
 });

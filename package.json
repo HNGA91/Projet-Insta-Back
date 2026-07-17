@@ -4,9 +4,9 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "nodemon src/Server.js",
-        "start": "node src/Server.js"
+		"test": "jest --runInBand --detectOpenHandles",
+		"dev": "nodemon src/Server.js",
+		"start": "node src/Server.js"
 	},
 	"keywords": [],
 	"author": "",
@@ -17,15 +17,23 @@
 		"bcryptjs": "^3.0.3",
 		"cookie-parser": "^1.4.7",
 		"cors": "^2.8.5",
-		"dotenv": "^17.2.3",
 		"express": "^5.1.0",
+		"express-rate-limit": "^8.5.2",
+		"helmet": "^8.2.0",
 		"jsonwebtoken": "^9.0.2",
 		"mongoose": "^8.20.0",
+		"multer": "^2.2.0",
 		"mysql2": "^3.22.3",
+		"nodemailer": "^9.0.3",
+		"pdfkit": "^0.19.1",
 		"sequelize": "^6.37.8",
-		"sequelize-cli": "^6.6.5"
+		"sequelize-cli": "^6.6.5",
+		"stripe": "^22.3.1"
 	},
 	"devDependencies": {
-		"nodemon": "^3.1.14"
+		"dotenv": "^17.2.3",
+		"jest": "^30.4.2",
+		"nodemon": "^3.1.14",
+		"supertest": "^7.2.2"
 	}
 }
