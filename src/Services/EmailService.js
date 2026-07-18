@@ -8,8 +8,9 @@ const nodemailer = require("nodemailer");
 // si Node.js tente de résoudre smtp.gmail.com en IPv6 en priorité.
 const transporter = nodemailer.createTransport({
 	host: "smtp.gmail.com",
-	port: 465,
-	secure: true, // true pour le port 465 (SSL/TLS direct)
+	port: 587,
+	secure: false,
+    requireTLS: true,
 	family: 4, // Force la résolution DNS en IPv4
 	auth: {
 		user: process.env.EMAIL_USER,
