@@ -2,8 +2,15 @@
 const nodemailer = require("nodemailer");
 
 // Configuration du transporteur SMTP Gmail
+// On précise host/port explicitement (au lieu du raccourci "service: gmail")
+// et on force family: 4 (IPv4) — certains hébergeurs (dont Railway) ont une
+// connectivité IPv6 sortante limitée, ce qui provoque une erreur ENETUNREACH
+// si Node.js tente de résoudre smtp.gmail.com en IPv6 en priorité.
 const transporter = nodemailer.createTransport({
-	service: "gmail",
+	host: "smtp.gmail.com",
+	port: 465,
+	secure: true, // true pour le port 465 (SSL/TLS direct)
+	family: 4, // Force la résolution DNS en IPv4
 	auth: {
 		user: process.env.EMAIL_USER,
 		pass: process.env.EMAIL_PASSWORD,
@@ -123,7 +130,7 @@ const envoyerEmailContact = async (nom, email, messageContact) => {
 	await transporter.sendMail(mailOptions);
 };
 
-// Envoi d'un email de commande et de la facture                        
+// Envoi d'un email de commande et de la facture
 const envoyerEmailConfirmationCommande = async (destinataire, prenom, commande, pdfBuffer) => {
 	const mailOptions = {
 		from: process.env.EMAIL_FROM,

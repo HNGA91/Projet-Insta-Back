@@ -229,7 +229,8 @@ router.post("/connexion", async (req, res) => {
 		res.cookie("refreshToken", refreshToken, {
 			httpOnly: true, // Inaccessible depuis JavaScript
 			secure: true, // HTTPS obligatoire aussi bien en dev qu'en prod grâce à mkcert
-			sameSite: "none", // Protection contre les attaques CSRF (Cross-Site Request Forgery). Cookie envoyé uniquement si la requête vient exactement du même site
+			sameSite: "none", // Protection contre les attaques CSRF (Cross-Site Request Forgery).
+            //  Cookie envoyé uniquement si la requête vient exactement du même site
 			maxAge: REFRESH_TOKEN_EXPIRY * 24 * 60 * 60 * 1000,
 		});
 
