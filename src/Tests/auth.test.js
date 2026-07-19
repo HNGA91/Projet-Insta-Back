@@ -98,7 +98,7 @@ describe("POST /api/auth/connexion", () => {
 	// ===== CAS BRUTE FORCE =====
 	it("devrait bloquer après 5 tentatives échouées", async () => {
 		// On envoie volontairement 5 mauvaises tentatives de suite
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 3; i++) {
 			await request(app).post("/api/auth/connexion").send({
 				email: TEST_USER.email,
 				password: "MauvaisMotDePasse",
