@@ -26,6 +26,7 @@
 		"mysql2": "^3.22.3",
 		"nodemailer": "^9.0.3",
 		"pdfkit": "^0.19.1",
+		"resend": "^6.17.2",
 		"sequelize": "^6.37.8",
 		"sequelize-cli": "^6.6.5",
 		"stripe": "^22.3.1"

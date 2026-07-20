@@ -1,57 +1,50 @@
-// Service centralisé pour l'envoi d'emails via l'API Brevo (HTTP)
-// On utilise l'API HTTP plutôt que le SMTP classique car certains hébergeurs
-// (dont Railway) bloquent ou limitent fortement les connexions SMTP sortantes,
-// alors que les appels HTTPS classiques ne posent aucun problème.
-const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+// Service centralisé pour l'envoi d'emails via Gmail SMTP (Nodemailer)
+const nodemailer = require("nodemailer");
 
-// Fonction utilitaire : envoie un email via l'API Brevo
+const transporter = nodemailer.createTransport({
+	service: "gmail",
+	auth: {
+		user: process.env.GMAIL_USER,
+		pass: process.env.GMAIL_APP_PASSWORD, // mot de passe d'application, pas le mot de passe du compte
+	},
+});
+
+const EXPEDITEUR = `Tech City <${process.env.GMAIL_USER}>`;
+
+// Fonction utilitaire : envoie un email via Gmail SMTP
 // attachments (optionnel) : tableau de { name, content } où content est un Buffer
-const envoyerEmailBrevo = async ({ to, subject, html, replyTo, attachments }) => {
-	const body = {
-		sender: {
-			name: "Tech City",
-			email: process.env.EMAIL_USER,
-		},
-		to: [{ email: to }],
+const envoyerEmailGmail = async ({ to, subject, html, replyTo, attachments }) => {
+	const mailOptions = {
+		from: EXPEDITEUR,
+		to,
 		subject,
-		htmlContent: html,
+		html,
 	};
 
 	if (replyTo) {
-		body.replyTo = { email: replyTo };
+		mailOptions.replyTo = replyTo;
 	}
 
 	if (attachments && attachments.length > 0) {
-		body.attachment = attachments.map((a) => ({
-			name: a.name,
-			// Brevo attend le contenu en base64
-			content: a.content.toString("base64"),
+		mailOptions.attachments = attachments.map((a) => ({
+			filename: a.name,
+			// Nodemailer accepte directement un Buffer, pas besoin de base64
+			content: a.content,
 		}));
 	}
 
-	const response = await fetch(BREVO_API_URL, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Accept: "application/json",
-			"api-key": process.env.BREVO_API_KEY,
-		},
-		body: JSON.stringify(body),
-	});
-
-	if (!response.ok) {
-		const errorData = await response.json().catch(() => ({}));
-		throw new Error(`Erreur Brevo (${response.status}): ${errorData.message || "Erreur inconnue"}`);
+	try {
+		return await transporter.sendMail(mailOptions);
+	} catch (error) {
+		throw new Error(`Erreur Gmail: ${error.message || "Erreur inconnue"}`);
 	}
-
-	return response.json();
 };
 
 // Vérification de la configuration au démarrage
-if (!process.env.BREVO_API_KEY) {
-	console.error("❌ BREVO_API_KEY manquante — le service email ne fonctionnera pas");
+if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+	console.error("❌ GMAIL_USER ou GMAIL_APP_PASSWORD manquant — le service email ne fonctionnera pas");
 } else {
-	console.log("✅ Service email (Brevo) configuré");
+	console.log("✅ Service email (Gmail) configuré");
 }
 
 // Envoi d'un email de réinitialisation de mot de passe
@@ -103,7 +96,7 @@ const envoyerEmailReset = async (destinataire, prenom, lienReset) => {
         </div>
     `;
 
-	await envoyerEmailBrevo({
+	await envoyerEmailGmail({
 		to: destinataire,
 		subject: "Réinitialisation de votre mot de passe",
 		html,
@@ -146,7 +139,7 @@ const envoyerEmailContact = async (nom, email, messageContact) => {
         </div>
     `;
 
-	await envoyerEmailBrevo({
+	await envoyerEmailGmail({
 		// L'email arrive dans la boîte Gmail (adresse configurée comme expéditeur)
 		to: process.env.EMAIL_USER,
 		subject: `[Contact] Message de ${nom}`,
@@ -195,7 +188,7 @@ const envoyerEmailConfirmationCommande = async (destinataire, prenom, commande, 
         </div>
     `;
 
-	await envoyerEmailBrevo({
+	await envoyerEmailGmail({
 		to: destinataire,
 		subject: `Confirmation de votre commande ${commande.reference}`,
 		html,
