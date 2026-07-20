@@ -2,11 +2,16 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-	service: "gmail",
+	host: "smtp.gmail.com",
+	port: 465,
+	secure: true,
 	auth: {
 		user: process.env.GMAIL_USER,
 		pass: process.env.GMAIL_APP_PASSWORD, // mot de passe d'application, pas le mot de passe du compte
 	},
+	// Force la résolution en IPv4 : certains hébergeurs (dont Railway) ont un réseau
+	// sortant IPv6 mal routé, ce qui provoque une erreur ENETUNREACH vers les serveurs Gmail.
+	family: 4,
 });
 
 const EXPEDITEUR = `Tech City <${process.env.GMAIL_USER}>`;
