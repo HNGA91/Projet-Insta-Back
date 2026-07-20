@@ -1,55 +1,53 @@
-// Service centralisé pour l'envoi d'emails via Gmail SMTP (Nodemailer)
-const nodemailer = require("nodemailer");
+// Service centralisé pour l'envoi d'emails via l'API Resend (HTTP)
+// On utilise l'API HTTP plutôt que le SMTP classique car Railway bloque/limite
+// fortement les connexions SMTP sortantes (confirmé : timeout sur Gmail SMTP),
+// alors que les appels HTTPS classiques ne posent aucun problème.
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-	host: "smtp.gmail.com",
-	port: 465,
-	secure: true,
-	auth: {
-		user: process.env.GMAIL_USER,
-		pass: process.env.GMAIL_APP_PASSWORD, // mot de passe d'application, pas le mot de passe du compte
-	},
-	// Force la résolution en IPv4 : certains hébergeurs (dont Railway) ont un réseau
-	// sortant IPv6 mal routé, ce qui provoque une erreur ENETUNREACH vers les serveurs Gmail.
-	family: 4,
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-const EXPEDITEUR = `Tech City <${process.env.GMAIL_USER}>`;
+// Adresse d'expéditeur : tant qu'aucun domaine perso n'est authentifié sur Resend,
+// on utilise leur adresse de test "onboarding@resend.dev" qui fonctionne sans configuration DNS.
+// ATTENTION : en mode sandbox (pas de domaine vérifié), Resend n'autorise l'envoi
+// QUE vers l'adresse email associée au compte Resend utilisé pour la clé API.
+const EXPEDITEUR = "Tech City <onboarding@resend.dev>";
 
-// Fonction utilitaire : envoie un email via Gmail SMTP
+// Fonction utilitaire : envoie un email via l'API Resend
 // attachments (optionnel) : tableau de { name, content } où content est un Buffer
-const envoyerEmailGmail = async ({ to, subject, html, replyTo, attachments }) => {
-	const mailOptions = {
+const envoyerEmailResend = async ({ to, subject, html, replyTo, attachments }) => {
+	const body = {
 		from: EXPEDITEUR,
-		to,
+		to: [to],
 		subject,
 		html,
 	};
 
 	if (replyTo) {
-		mailOptions.replyTo = replyTo;
+		body.replyTo = replyTo;
 	}
 
 	if (attachments && attachments.length > 0) {
-		mailOptions.attachments = attachments.map((a) => ({
+		body.attachments = attachments.map((a) => ({
 			filename: a.name,
-			// Nodemailer accepte directement un Buffer, pas besoin de base64
-			content: a.content,
+			// Resend accepte le contenu en base64 (string)
+			content: a.content.toString("base64"),
 		}));
 	}
 
-	try {
-		return await transporter.sendMail(mailOptions);
-	} catch (error) {
-		throw new Error(`Erreur Gmail: ${error.message || "Erreur inconnue"}`);
+	const { data, error } = await resend.emails.send(body);
+
+	if (error) {
+		throw new Error(`Erreur Resend (${error.statusCode || ""}): ${error.message || "Erreur inconnue"}`);
 	}
+
+	return data;
 };
 
 // Vérification de la configuration au démarrage
-if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-	console.error("❌ GMAIL_USER ou GMAIL_APP_PASSWORD manquant — le service email ne fonctionnera pas");
+if (!process.env.RESEND_API_KEY) {
+	console.error("❌ RESEND_API_KEY manquante — le service email ne fonctionnera pas");
 } else {
-	console.log("✅ Service email (Gmail) configuré");
+	console.log("✅ Service email (Resend) configuré");
 }
 
 // Envoi d'un email de réinitialisation de mot de passe
@@ -101,7 +99,7 @@ const envoyerEmailReset = async (destinataire, prenom, lienReset) => {
         </div>
     `;
 
-	await envoyerEmailGmail({
+	await envoyerEmailResend({
 		to: destinataire,
 		subject: "Réinitialisation de votre mot de passe",
 		html,
@@ -144,7 +142,7 @@ const envoyerEmailContact = async (nom, email, messageContact) => {
         </div>
     `;
 
-	await envoyerEmailGmail({
+	await envoyerEmailResend({
 		// L'email arrive dans la boîte Gmail (adresse configurée comme expéditeur)
 		to: process.env.EMAIL_USER,
 		subject: `[Contact] Message de ${nom}`,
@@ -193,7 +191,7 @@ const envoyerEmailConfirmationCommande = async (destinataire, prenom, commande, 
         </div>
     `;
 
-	await envoyerEmailGmail({
+	await envoyerEmailResend({
 		to: destinataire,
 		subject: `Confirmation de votre commande ${commande.reference}`,
 		html,
